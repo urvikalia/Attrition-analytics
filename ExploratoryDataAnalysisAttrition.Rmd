@@ -1,0 +1,301 @@
+---
+title: "Data Exploration : Attrition Analytics "
+author: "Ameya Ghasias, Dhijith CD, Urvi Kalia"
+date: "23 June 2016"
+output:
+  html_document:
+    fig_height: 4
+    highlight: pygments
+    theme: spacelab
+    toc_float: yes
+  pdf_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Introduction
+
+The purpose of this documentation is to showcase the findings of the exploratory data analysis on attrition dataset, obtained from IBM watson analytics website <reference>.
+ 
+To brief about the dataset , It contains details about past employees of a company (details not known).It includes  demographic details, work related details, various ratings and whether the employee has left the company or not.
+
+Since the source of the data is not known, here are some asumptions on which further analysis will be based.
+
+* The given data is a representive sample.It is assumed that the simple random sampling technique is used to draw/collect data and hence the inferences can be generaized.
+* It is assumed that the data collection was as per required standards with minimal or no data collection issues.
+
+## Setup
+
+The initial setup includes loading the required packages and the data.
+
+### Load packages
+
+```{r load-packages, message = FALSE}
+library(ggplot2)
+library(dplyr)
+library(grid)
+library(gridExtra)
+library(gmodels)
+library(corrplot)
+```
+
+### Load Data
+```{r load-data}
+employeeData <-read.csv("HR-Employee-Attrition.csv",header = TRUE)
+sum(is.na(employeeData))
+dim(employeeData)
+```
+
+```{r initial-setup,echo=FALSE}
+theme <- theme(axis.text=element_text(size=7),axis.text.x = element_text(angle = 45, vjust = 1, hjust=1),plot.title = element_text(size=9, margin = margin(10, 0, 10, 0))) 
+```
+
+The dataset contain no missing values.
+
+### PreProcessing 
+
+Mentioned below are some of the preprocessing done :
+
+1. Few variables have numeric ratings.These are transformed to a readable format as factors.Attributes which are transformed as factors are :          
+
+    + *Education*
+    + *Environment Satisfaction*
+    + *Job Involvement*
+    + *Job Satisfaction*
+    + *Performance rating*
+    + *Relationship satisfaction*
+    + *Work life balance*
+    
+
+2. Atrributes named *JobLevel* and *StockOptionLevel* are also changed to categorical , as they represent levels.
+3. Attributes named *EmployeeCount* , *Over18* , *StandardHours* are ignored, as they are constants or should be said uniformly distributed across.
+4. *EmployeeNumber* to be considered as row names.
+5. *Attrition* is the response variable.
+
+```{r transform-data,echo=FALSE}
+## transformation to factors 
+## Education 
+employeeData$Education[employeeData$Education==1] = "Below College"
+employeeData$Education[employeeData$Education==2] = "College"
+employeeData$Education[employeeData$Education==3] = "Bachelor"
+employeeData$Education[employeeData$Education==4] = "Master"
+employeeData$Education[employeeData$Education==5] = "Doctor"
+employeeData$Education <- factor(employeeData$Education)
+
+## EnvironmentSatisfaction
+employeeData$EnvironmentSatisfaction[employeeData$EnvironmentSatisfaction==1] ="Low"
+employeeData$EnvironmentSatisfaction[employeeData$EnvironmentSatisfaction==2] ="Medium"
+employeeData$EnvironmentSatisfaction[employeeData$EnvironmentSatisfaction==3] ="High"
+employeeData$EnvironmentSatisfaction[employeeData$EnvironmentSatisfaction==4] ="Very High"
+employeeData$EnvironmentSatisfaction <- factor(employeeData$EnvironmentSatisfaction)
+
+## JobInvolvement
+employeeData$JobInvolvement[employeeData$JobInvolvement==1]="Low"
+employeeData$JobInvolvement[employeeData$JobInvolvement==2] ="Medium"
+employeeData$JobInvolvement[employeeData$JobInvolvement==3] ="High"
+employeeData$JobInvolvement[employeeData$JobInvolvement==4] ="Very High"
+employeeData$JobInvolvement <- factor(employeeData$JobInvolvement)
+
+## JobSatisfaction
+employeeData$JobSatisfaction[employeeData$JobSatisfaction==1]="Low"
+employeeData$JobSatisfaction[employeeData$JobSatisfaction==2] ="Medium"
+employeeData$JobSatisfaction[employeeData$JobSatisfaction==3] ="High"
+employeeData$JobSatisfaction[employeeData$JobSatisfaction==4] ="Very High"
+employeeData$JobSatisfaction <- factor(employeeData$JobSatisfaction)
+
+## PerformanceRating
+employeeData$PerformanceRating[employeeData$PerformanceRating==1]="Low"
+employeeData$PerformanceRating[employeeData$PerformanceRating==2] ="Good"
+employeeData$PerformanceRating[employeeData$PerformanceRating==3] ="'Excellent"
+employeeData$PerformanceRating[employeeData$PerformanceRating==4] ="Outstanding"
+employeeData$PerformanceRating <- factor(employeeData$PerformanceRating)
+
+## RelationshipSatisfaction
+employeeData$RelationshipSatisfaction[employeeData$RelationshipSatisfaction==1]="Low"
+employeeData$RelationshipSatisfaction[employeeData$RelationshipSatisfaction==2] ="Medium"
+employeeData$RelationshipSatisfaction[employeeData$RelationshipSatisfaction==3] ="High"
+employeeData$RelationshipSatisfaction[employeeData$RelationshipSatisfaction==4] ="Very High"
+employeeData$RelationshipSatisfaction <- factor(employeeData$RelationshipSatisfaction)
+
+## WorkLifeBalance
+employeeData$WorkLifeBalance[employeeData$WorkLifeBalance==1]="Bad"
+employeeData$WorkLifeBalance[employeeData$WorkLifeBalance==2] ="Good"
+employeeData$WorkLifeBalance[employeeData$WorkLifeBalance==3] ="Better"
+employeeData$WorkLifeBalance[employeeData$WorkLifeBalance==4] ="Best"
+employeeData$WorkLifeBalance <- factor(employeeData$WorkLifeBalance)
+
+## JobLevel and StockOptionLevel: categorical
+employeeData$JobLevel <- factor(employeeData$JobLevel)
+employeeData$StockOptionLevel <- factor(employeeData$StockOptionLevel)
+employeeData <- employeeData[-c(9,21,26)]
+
+```
+
+After all the above preprocessing we are left with 31 variables , including the response variable.17 of them being categorical variables and 14 numeric.
+
+
+##Categorical  variables 
+
+```{r cgroup1,echo=FALSE}
+department <- ggplot(employeeData,aes(Department,fill=Attrition))+ geom_bar(position="dodge")+ xlab("") + ylab("Frequency") +ggtitle("Department distribution") + theme
+businessTravel <- ggplot(employeeData,aes(BusinessTravel,fill=Attrition))+ geom_bar(position="dodge")+ xlab("") + ylab("Frequency") +ggtitle("Business Travel distribution") + theme
+grid.arrange(department,businessTravel,ncol=2)
+```
+
+```{r cgroup2,echo=FALSE}
+education <- ggplot(employeeData,aes(Education,fill=Attrition))+ geom_bar(position="dodge")+ xlab("") + ylab("Frequency") +ggtitle("Education distribution") + theme
+educationField <- ggplot(employeeData,aes(EducationField,fill=Attrition))+ geom_bar(position="dodge")+ xlab("") + ylab("Frequency") +ggtitle("Education Field distribution") + theme
+grid.arrange(education,educationField,ncol=2)
+```
+
+```{r cgroup3,echo=FALSE}
+environmentSatisfaction <- ggplot(employeeData,aes(EnvironmentSatisfaction,fill=Attrition))+ geom_bar(position="dodge")+ xlab("") + ylab("Frequency") +ggtitle("Environment Satisfaction distribution") + theme
+jobInvolvement <- ggplot(employeeData,aes(JobInvolvement,fill=Attrition))+ geom_bar(position="dodge")+ xlab("") + ylab("Frequency") +ggtitle("Job Involvement distribution") + theme
+grid.arrange(environmentSatisfaction,jobInvolvement,ncol=2)
+```
+
+
+```{r cgroup4,echo=FALSE}
+gender <- ggplot(employeeData,aes(Gender,fill=Attrition))+ geom_bar(position="dodge")+ xlab("") + ylab("Frequency") +ggtitle("Gender distribution") + theme
+maritalStatus <- ggplot(employeeData,aes(MaritalStatus,fill=Attrition))+ geom_bar(position="dodge")+ xlab("") + ylab("Frequency") +ggtitle("Marital Status distribution") + theme
+grid.arrange(gender,maritalStatus,ncol=2)
+```
+
+```{r cgroup5,echo=FALSE}
+jobRole <- ggplot(employeeData,aes(JobRole,fill=Attrition))+ geom_bar(position="dodge")+ xlab("") + ylab("Frequency") +ggtitle("Job Role distribution") + theme
+jobSatisfaction <- ggplot(employeeData,aes(JobSatisfaction,fill=Attrition))+ geom_bar(position="dodge")+ xlab("") + ylab("Frequency") +ggtitle("Job Satisfaction distribution") + theme
+
+jobLevel <- ggplot(employeeData,aes(JobLevel,fill=Attrition))+ geom_bar(position="dodge")+ xlab("") + ylab("Frequency") +ggtitle("Job Level distribution") + theme
+stockOptionLevel <- ggplot(employeeData,aes(StockOptionLevel,fill=Attrition))+ geom_bar(position="dodge")+ xlab("") + ylab("Frequency") +ggtitle("Stock OptionLevel distribution") + theme
+grid.arrange(jobRole,jobSatisfaction,ncol=2)
+grid.arrange(jobLevel,stockOptionLevel,ncol=2)
+```
+
+```{r cgroup6,echo=FALSE}
+overTime <- ggplot(employeeData,aes(OverTime,fill=Attrition))+ geom_bar(position="dodge")+ xlab("") + ylab("Frequency") +ggtitle("Over Time distribution") + theme
+performanceRating <- ggplot(employeeData,aes(PerformanceRating,fill=Attrition))+ geom_bar(position="dodge")+ xlab("") + ylab("Frequency") +ggtitle("PerformanceRating distribution") + theme
+#relationshipSatisfaction <- ggplot(employeeData,aes(RelationshipSatisfaction))+ geom_bar()+ #xlab("") + ylab("Frequency") +ggtitle("Relationship Satisfaction distribution") + theme
+workLifeBalance <- ggplot(employeeData,aes(WorkLifeBalance,fill=Attrition))+ geom_bar(position="dodge")+ xlab("") + ylab("Frequency") +ggtitle("Work Life Balance distribution") + theme
+grid.arrange(overTime,performanceRating,workLifeBalance,ncol=3)
+#grid.arrange(relationshipSatisfaction,workLifeBalance,ncol=2)
+```
+
+Using Chi-square test of independence ,independence of categorical variable with *Attrition* can be evaluated.
+
+```{r chi-square,echo=FALSE,warning=FALSE}
+dept_chisqr <-chisq.test(table(employeeData$Department,employeeData$Attrition))
+bTravel_chisqr <-chisq.test(table(employeeData$BusinessTravel,employeeData$Attrition))
+edu_chisqr <-chisq.test(table(employeeData$Education,employeeData$Attrition))
+eField_chisqr <-chisq.test(table(employeeData$EducationField,employeeData$Attrition))
+esatisfy_chisqr <-chisq.test(table(employeeData$EnvironmentSatisfaction,employeeData$Attrition))
+jobinvolve_chisqr <-chisq.test(table(employeeData$JobInvolvement,employeeData$Attrition))
+gender_chisqr <-chisq.test(table(employeeData$Gender,employeeData$Attrition))
+maritalS_chisqr <-chisq.test(table(employeeData$MaritalStatus,employeeData$Attrition))
+jRole_chisqr <-chisq.test(table(employeeData$JobRole,employeeData$Attrition))
+jsatisfy_chisqr <-chisq.test(table(employeeData$JobSatisfaction,employeeData$Attrition))
+jlevel_chisqr <-chisq.test(table(employeeData$JobLevel,employeeData$Attrition))
+stock_chisqr <-chisq.test(table(employeeData$StockOptionLevel,employeeData$Attrition))
+oTime_chisqr <- chisq.test(table(employeeData$OverTime,employeeData$Attrition))
+prating_chisqr <-chisq.test(table(employeeData$PerformanceRating,employeeData$Attrition))
+#relationsat_chisqr <-chisq.test(table(employeeData$RelationshipSatisfaction,
+#employeeData$Attrition))
+wlbalance_chisqr <-chisq.test(table(employeeData$WorkLifeBalance,employeeData$Attrition))
+```
+
+  Variable                |   P- value                     |  
+--------------------------|--------------------------------|
+  Department              | `r dept_chisqr$p.value `       |
+    Business Travel       |  `r bTravel_chisqr$p.value `   |
+     Education            | `r edu_chisqr$p.value `        |
+    Education Field       |  `r eField_chisqr$p.value `    |
+Environment Satisfaction  | `r esatisfy_chisqr$p.value `   |
+    Job involvement       |  `r jobinvolve_chisqr$p.value `|
+     Gender               | `r gender_chisqr$p.value `     |
+    Marital status        |  `r maritalS_chisqr$p.value `  |
+     Job role             | `r jRole_chisqr$p.value `      |
+    Job Satisfaction      |  `r jsatisfy_chisqr$p.value `  |
+    Job level             | `r jlevel_chisqr$p.value `     |
+    Stock Options level   |  `r stock_chisqr$p.value `     |
+     Overtime             | `r oTime_chisqr$p.value `      |
+    Performance Rating    |  `r prating_chisqr$p.value `   |
+    Work life balance     |  `r wlbalance_chisqr$p.value ` |
+                          |                                |
+
+From the above table, we can infer *Attrition* and *Business Travel* , *Environment Satisfaction*, *Job involvement* , *Marital status* , *Job role* , *Job Satisfaction*, *Job level* , *Stock Options level*,  *Overtime* and *Work life balance* are not independent.
+
+
+```{r}
+CrossTable(employeeData$OverTime,employeeData$Attrition)
+```
+
+Attrition rate is higher amoung the employees working over time.Working over time , seams to be a vital indicator. 
+
+
+##Numeric variables 
+
+```{r,echo=FALSE}
+employeeData_numeric <- employeeData[colnames(employeeData) %in% c("Age","DailyRate",
+"DistanceFromHome","HourlyRate","MonthlyIncome","MonthlyRate","NumCompaniesWorked",
+"PercentSalaryHike","TotalWorkingYears","TrainingTimesLastYear","YearsAtCompany",
+"YearsInCurrentRole","YearsSinceLastPromotion","YearsWithCurrManager")]
+corrplot(cor(employeeData_numeric),order ="FPC")
+```
+
+Correlation plot clearly depicts, high correlation among the following :
+
+* Years with Current Manager, Years at current company and years in current role
+* Age and Total working years
+* Monthly Income and Total working years
+* Years at company and total working years
+
+
+```{r,echo=FALSE}
+percentSalaryHike <-ggplot(employeeData,aes(PercentSalaryHike))+ geom_histogram(binwidth = 2)+ ylab("Frequency")+xlab("")+  xlim(10,30) +ggtitle("Percentage salary hike distribution") +theme
+#numCompaniesWorked <-ggplot(employeeData,aes(NumCompaniesWorked))+ geom_histogram(binwidth = 2)+ #xlab("Percentage salary hike") + ylab("Frequency")+  xlim(10,30) +ggtitle("Percentage salary #hike distribution") +theme
+grid.arrange(percentSalaryHike,ncol=2)
+
+```
+
+```{r ,echo=FALSE}
+totalWorkingYears <-ggplot(employeeData,aes(TotalWorkingYears))+ geom_histogram(binwidth = 3) + ylab("Frequency")+xlab("") +ggtitle("Experience distribution") +theme
+
+YearsAtCompany <-ggplot(employeeData,aes(YearsAtCompany))+ geom_histogram(binwidth = 3) + ylab("Frequency") +xlab("")+ggtitle("Years at company distribution") +theme
+
+yearsInCurrentRole <-ggplot(employeeData,aes(YearsInCurrentRole))+ geom_histogram(binwidth = 2) + ylab("Frequency")+xlab("") + ggtitle("Years in current role distribution") +theme
+
+YearsSinceLastPromotion <-ggplot(employeeData,aes(YearsSinceLastPromotion))+ geom_histogram(binwidth = 5)+ylab("Frequency")+xlab("") +  ggtitle("Years since last promotion distribution") +theme
+
+grid.arrange(totalWorkingYears,YearsAtCompany,ncol=2)
+grid.arrange(yearsInCurrentRole,YearsSinceLastPromotion,ncol=2)
+```
+
+```{r,echo=FALSE}
+trainingTimesLastYear <-ggplot(employeeData,aes(TrainingTimesLastYear))+ geom_histogram(binwidth = 1) +xlab("") +ylab("Frequency") +ggtitle("No. of Trainings since last year distribution") +theme
+
+yearsWithCurrManager <-ggplot(employeeData,aes(YearsWithCurrManager))+ geom_histogram(binwidth = 2)+ ylab("Frequency") +xlab("")+ggtitle("Years with current manager distribution") +theme
+
+grid.arrange(trainingTimesLastYear,yearsWithCurrManager,ncol=2)
+```
+
+```{r,echo=FALSE}
+dailyRate <-ggplot(employeeData,aes(DailyRate))+ geom_histogram(binwidth = 100)+ ylab("Frequency") +xlab("")+ ggtitle("Daily rate distribution") +theme
+
+hourlyRate <-ggplot(employeeData,aes(HourlyRate))+ geom_histogram(binwidth = 10)+ ylab("Frequency") +xlab("")+ggtitle("Hourly rate distribution") +theme
+
+monthlyIncome <-ggplot(employeeData,aes(MonthlyIncome))+ geom_histogram(binwidth = 1000)+ ylab("Frequency") +xlab("")+ggtitle("Monthly income distribution") +theme
+
+monthlyRate <-ggplot(employeeData,aes(MonthlyRate))+ geom_histogram(binwidth = 1000)+ ylab("Frequency") +xlab("")+ggtitle("Monthly rate distribution") +theme
+
+grid.arrange(dailyRate,hourlyRate,monthlyIncome,monthlyRate, ncol=2,nrow =2)
+
+```
+
+
+Distribution of daily rate,hourly rate and monthly rate appears to be uniform.Technically they should have a similar distribution as of monthly income.But there appears to be quite a lot of difference.
+Since details about the data are not known, these variables will not be considered while modeling. 
+
+## Conclusion
+
+Finally we are left with 16 categorical variables and 11 numeric varaibles.
